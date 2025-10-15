@@ -184,8 +184,3 @@ def delete_contact(contact_id):
     db.session.commit()
     return jsonify({'message': 'Contact deleted successfully'})
 
-# --- Main entry point ---
-if __name__ == '__main__':
-    # Removed db.create_all() from here
-    app.run(debug=True)
-
