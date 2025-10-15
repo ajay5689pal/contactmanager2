@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Contact App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+    <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
+        <h2 class="text-3xl font-bold text-center text-gray-900 mb-6">Create an Account</h2>
+
+        <!-- Flash messages for errors -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+                    <span class="block sm:inline">{{ messages[0] }}</span>
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/signup">
+            <div class="mb-4">
+                <label for="username" class="block text-gray-700 font-medium mb-2">Username</label>
+                <input type="text" id="username" name="username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            </div>
+            <div class="mb-6">
+                <label for="password" class="block text-gray-700 font-medium mb-2">Password</label>
+                <input type="password" id="password" name="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            </div>
+            <div class="mb-6">
+                <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300">
+                    Sign Up
+                </button>
+            </div>
+        </form>
+        <p class="text-center text-gray-600">
+            Already have an account? <a href="{{ url_for('login') }}" class="text-blue-600 hover:underline">Log in</a>
+        </p>
+    </div>
+
+</body>
+</html>
