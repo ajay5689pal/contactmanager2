@@ -1,3 +1,4 @@
+
 import os
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -9,7 +10,9 @@ app = Flask(__name__)
 
 # --- Configuration ---
 # Set a secret key for session management and security
-app.config['SECRET_KEY'] = os.urandom(24)
+# In a real deployment, you should set this from an environment variable
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
+
 # Define the path for the SQLite database
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'contacts.db')
@@ -21,6 +24,8 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 # If a user tries to access a protected page, redirect them to the 'login' page
 login_manager.login_view = 'login'
+# Optional: Add a more user-friendly message
+login_manager.login_message = 'Please log in to access this page.'
 
 # --- Database Models ---
 class User(UserMixin, db.Model):
@@ -31,9 +36,11 @@ class User(UserMixin, db.Model):
     contacts = db.relationship('Contact', backref='owner', lazy=True, cascade="all, delete-orphan")
 
     def set_password(self, password):
+        """Hashes and sets the user's password."""
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
+        """Checks if the provided password matches the stored hash."""
         return check_password_hash(self.password_hash, password)
 
 class Contact(db.Model):
@@ -45,6 +52,7 @@ class Contact(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     def to_dict(self):
+        """Serializes the contact object to a dictionary."""
         return {
             'id': self.id,
             'name': self.name,
@@ -69,42 +77,59 @@ def init_db_command():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+    
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
+        
         if user and user.check_password(password):
             login_user(user)
-            return redirect(url_for('index'))
+            # Redirect to the page the user was trying to access, or to index
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
         else:
-            flash('Invalid username or password')
+            flash('Invalid username or password. Please try again.', 'danger')
+            
     return render_template('login.html')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+        
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        
+        if not username or not password:
+            flash('Username and password are required.', 'warning')
+            return redirect(url_for('signup'))
+            
         existing_user = User.query.filter_by(username=username).first()
+        
         if existing_user:
-            flash('Username already exists.')
+            flash('Username already exists. Please choose a different one.', 'warning')
             return redirect(url_for('signup'))
         
+        # Create new user
         new_user = User(username=username)
         new_user.set_password(password)
+        
+        # Add to database
         db.session.add(new_user)
         db.session.commit()
         
-        flash('Account created successfully! Please log in.')
+        flash('Account created successfully! Please log in.', 'success')
         return redirect(url_for('login'))
+        
     return render_template('signup.html')
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
+    flash('You have been logged out.', 'success')
     return redirect(url_for('login'))
 
 # --- Main Application and API Routes ---
@@ -130,7 +155,8 @@ def get_contacts():
             )
         )
     
-    contacts = query.all()
+    # Order by name alphabetically
+    contacts = query.order_by(Contact.name).all()
     return jsonify([contact.to_dict() for contact in contacts])
 
 @app.route('/api/contacts/<int:contact_id>', methods=['GET'])
@@ -147,6 +173,9 @@ def get_contact(contact_id):
 def add_contact():
     """API endpoint to add a new contact for the logged-in user."""
     data = request.json
+    if not data or not data.get('name'):
+        return jsonify({'error': 'Name is a required field.'}), 400
+        
     new_contact = Contact(
         name=data.get('name'),
         phone=data.get('phone'),
@@ -166,6 +195,9 @@ def update_contact(contact_id):
         return jsonify({'error': 'Contact not found or access denied'}), 404
     
     data = request.json
+    if not data or not data.get('name'):
+        return jsonify({'error': 'Name is a required field.'}), 400
+        
     contact.name = data.get('name', contact.name)
     contact.phone = data.get('phone', contact.phone)
     contact.email = data.get('email', contact.email)
@@ -184,3 +216,10 @@ def delete_contact(contact_id):
     db.session.commit()
     return jsonify({'message': 'Contact deleted successfully'})
 
+# --- Main entry point for local development ---
+if __name__ == '__main__':
+    # This block runs only when you execute `python app.py` directly
+    # It is not used by production servers (like Gunicorn or uWSGI)
+    with app.app_context():
+        db.create_all() # Automatically create tables for local dev
+    app.run(debug=True)
