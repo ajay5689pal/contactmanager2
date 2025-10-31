@@ -11,11 +11,10 @@ app = Flask(__name__)
 # --- Configuration ---
 # Set a secret key for session management and security
 # In a real deployment, you should set this from an environment variable
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
+app.config['SECRET_KEY'] = "@VCS72xppdv"
 
 # Define the path for the SQLite database
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'contacts.db')
+app.config['SQLALCHEMY_DATABASE_URI']= "sqlite:///database.db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # --- Database and Login Manager Initialization ---
@@ -216,10 +215,3 @@ def delete_contact(contact_id):
     db.session.commit()
     return jsonify({'message': 'Contact deleted successfully'})
 
-# --- Main entry point for local development ---
-if __name__ == '__main__':
-    # This block runs only when you execute `python app.py` directly
-    # It is not used by production servers (like Gunicorn or uWSGI)
-    with app.app_context():
-        db.create_all() # Automatically create tables for local dev
-    app.run(debug=True)
