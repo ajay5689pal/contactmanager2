@@ -21,7 +21,7 @@ instance_folder = os.path.dirname(db_path)
 if not os.path.exists(instance_folder):
     os.makedirs(instance_folder)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///database.db"
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # --- Database and Login Manager Initialization ---
@@ -62,8 +62,8 @@ class Contact(db.Model):
         }
 
 # --- Database Initialization Command ---
-# We removed the global db.create_all()
-# Instead, we add this command to run from the Render Start Command
+# This command is run by Render's "Start Command"
+# to create the database tables on the persistent disk.
 @app.cli.command("init-db")
 def init_db_command():
     """Creates the database tables."""
