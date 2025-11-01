@@ -23,11 +23,15 @@
 
     <div class="container mx-auto p-4 md:p-8 max-w-4xl">
         <header class="mb-8">
+            <!-- New Total Contacts Display -->
+            <div class="mb-4">
+                <h2 class="text-xl font-semibold text-gray-700">Total Contacts: <span id="totalContactsDisplay" class="text-blue-600 font-bold">0</span></h2>
+            </div>
+
             <div class="flex justify-between items-center">
-                 <div class="flex items-center gap-3">
-                    <!-- Title and new Contact Count Badge -->
+                 <div>
+                    <!-- Title -->
                     <h1 class="text-3xl font-bold text-gray-900">My Contacts</h1>
-                    <span id="contactCountBadge" class="bg-blue-100 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full hidden">0</span>
                  </div>
                  <div class="text-right">
                     <!-- Welcome message and Logout link -->
@@ -97,7 +101,7 @@
             const contactsList = document.getElementById('contactsList');
             const noContactsMessage = document.getElementById('noContactsMessage');
             const searchInput = document.getElementById('searchInput');
-            const contactCountBadge = document.getElementById('contactCountBadge');
+            const totalContactsDisplay = document.getElementById('totalContactsDisplay'); // Changed ID
 
             // Modal elements
             const modal = document.getElementById('contactModal');
@@ -153,8 +157,7 @@
                         throw new Error(`Failed to fetch count: ${response.status} ${response.statusText}`);
                     }
                     const data = await response.json();
-                    contactCountBadge.textContent = data.count;
-                    contactCountBadge.classList.remove('hidden');
+                    totalContactsDisplay.textContent = data.count; // Updated to new element
                 } catch (error) {
                     console.error('Failed to fetch contact count:', error);
                 }
@@ -312,4 +315,3 @@
 
 </body>
 </html>
-
