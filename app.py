@@ -8,13 +8,19 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 
 # --- Configuration ---
-# Set a secret key for session management and security
 app.config['SECRET_KEY'] = "@VCS72xppdv"
 
 # --- FIX FOR RENDER ---
-# Point the database to Render's persistent disk path
-# We'll create a disk at /var/data in the Render dashboard
-db_path = os.path.join(os.environ.get('RENDER_DISK_PATH', '/var/data'), 'database.db')
+# Point the database to Render's persistent disk path.
+# This path is available when the "Start Command" runs.
+# We set a default for local testing, but Render will use /var/data.
+db_path = os.path.join(os.environ.get('RENDER_DISK_PATH', 'instance'), 'database.db')
+
+# Ensure the directory exists before connecting (for local testing)
+instance_folder = os.path.dirname(db_path)
+if not os.path.exists(instance_folder):
+    os.makedirs(instance_folder)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -34,11 +40,9 @@ class User(UserMixin, db.Model):
     contacts = db.relationship('Contact', backref='owner', lazy=True, cascade="all, delete-orphan")
 
     def set_password(self, password):
-        """Hashes and sets the user's password."""
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
-        """Checks if the provided password matches the stored hash."""
         return check_password_hash(self.password_hash, password)
 
 class Contact(db.Model):
@@ -50,7 +54,6 @@ class Contact(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     def to_dict(self):
-        """Serializes the contact object to a dictionary."""
         return {
             'id': self.id,
             'name': self.name,
@@ -58,20 +61,16 @@ class Contact(db.Model):
             'email': self.email
         }
 
+# --- Auto-create Database on Start ---
+# This code runs when Gunicorn starts the app.
+# It ensures the database and tables exist at the correct path.
+with app.app_context():
+    db.create_all()
+
 @login_manager.user_loader
 def load_user(user_id):
     """Loads a user from the database for Flask-Login."""
     return User.query.get(int(user_id))
-
-# --- New Database Initialization Command ---
-@app.cli.command("init-db")
-def init_db_command():
-    """Creates the database tables."""
-    # Use 'with app.app_context()' to ensure db.create_all() has access
-    # to the app configuration, especially the database URI.
-    with app.app_context():
-        db.create_all()
-    print("Initialized the database.")
 
 # --- Authentication Routes ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -112,11 +111,9 @@ def signup():
             flash('Username already exists. Please choose a different one.', 'warning')
             return redirect(url_for('signup'))
         
-        # Create new user
         new_user = User(username=username)
         new_user.set_password(password)
         
-        # Add to database
         db.session.add(new_user)
         db.session.commit()
         
