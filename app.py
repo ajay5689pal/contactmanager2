@@ -215,3 +215,9 @@ def delete_contact(contact_id):
     db.session.commit()
     return jsonify({'message': 'Contact deleted successfully'})
 
+@app.route('/api/contacts/count', methods=['GET'])
+@login_required
+def get_contacts_count():
+    """Returns the total number of contacts for the current user."""
+    count = Contact.query.filter_by(user_id=current_user.id).count()
+    return jsonify({'count': count})
