@@ -21,7 +21,7 @@ instance_folder = os.path.dirname(db_path)
 if not os.path.exists(instance_folder):
     os.makedirs(instance_folder)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
+app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///database.db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # --- Database and Login Manager Initialization ---
