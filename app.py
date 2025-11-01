@@ -1,4 +1,3 @@
-
 import os
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -10,20 +9,20 @@ app = Flask(__name__)
 
 # --- Configuration ---
 # Set a secret key for session management and security
-# In a real deployment, you should set this from an environment variable
 app.config['SECRET_KEY'] = "@VCS72xppdv"
 
-# Define the path for the SQLite database
-app.config['SQLALCHEMY_DATABASE_URI']= "sqlite:///database.db"
+# --- FIX FOR RENDER ---
+# Point the database to Render's persistent disk path
+# We'll create a disk at /var/data in the Render dashboard
+db_path = os.path.join(os.environ.get('RENDER_DISK_PATH', '/var/data'), 'database.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # --- Database and Login Manager Initialization ---
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
-# If a user tries to access a protected page, redirect them to the 'login' page
 login_manager.login_view = 'login'
-# Optional: Add a more user-friendly message
 login_manager.login_message = 'Please log in to access this page.'
 
 # --- Database Models ---
@@ -68,7 +67,10 @@ def load_user(user_id):
 @app.cli.command("init-db")
 def init_db_command():
     """Creates the database tables."""
-    db.create_all()
+    # Use 'with app.app_context()' to ensure db.create_all() has access
+    # to the app configuration, especially the database URI.
+    with app.app_context():
+        db.create_all()
     print("Initialized the database.")
 
 # --- Authentication Routes ---
@@ -84,7 +86,6 @@ def login():
         
         if user and user.check_password(password):
             login_user(user)
-            # Redirect to the page the user was trying to access, or to index
             next_page = request.args.get('next')
             return redirect(next_page or url_for('index'))
         else:
@@ -154,7 +155,6 @@ def get_contacts():
             )
         )
     
-    # Order by name alphabetically
     contacts = query.order_by(Contact.name).all()
     return jsonify([contact.to_dict() for contact in contacts])
 
@@ -221,3 +221,4 @@ def get_contacts_count():
     """Returns the total number of contacts for the current user."""
     count = Contact.query.filter_by(user_id=current_user.id).count()
     return jsonify({'count': count})
+
