@@ -10,16 +10,12 @@ app = Flask(__name__)
 # --- Configuration ---
 app.config['SECRET_KEY'] = "@VCS72xppdv"
 
-# --- DATABASE CONFIGURATION FOR RENDER FREE TIER ---
-# We will use a SQLite database file.
+# --- DATABASE CONFIGURATION FOR RENDER FREE TIER (SIMPLIFIED) ---
+# We will use a SQLite database file named 'database.db' in the root project directory.
+# This avoids any pathing issues with the 'instance' folder.
 # WARNING: On Render's free tier, this file will be DELETED
 # every time the app restarts or goes to sleep. All data will be lost.
-db_path = os.path.join('instance', 'database.db')
-instance_folder = os.path.dirname(db_path)
-if not os.path.exists(instance_folder):
-    os.makedirs(instance_folder)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
+app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///database.db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # --- Database and Login Manager Initialization ---
@@ -31,8 +27,7 @@ login_manager.login_message = 'Please log in to access this page.'
 
 # --- Database Auto-Creation (THE FIX) ---
 # This function runs before the *first request* to the app.
-# This is safer than creating tables at the global level,
-# which caused the error when Gunicorn imported the file.
+# This is safer than creating tables at the global level.
 @app.before_request
 def create_tables_on_first_request():
     # We use a custom flag on 'app' to ensure this runs only ONCE
@@ -223,3 +218,4 @@ def get_contacts_count():
     """Returns the total number of contacts for the current user."""
     count = Contact.query.filter_by(user_id=current_user.id).count()
     return jsonify({'count': count})
+
