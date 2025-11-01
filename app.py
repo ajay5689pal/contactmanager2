@@ -29,12 +29,20 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 
-# --- Database Auto-Creation ---
-# This will create the database tables every time the app starts.
-# This is necessary for Render's free tier ephemeral filesystem.
-with app.app_context():
-    db.create_all()
-    print("Database tables checked/created.")
+# --- Database Auto-Creation (THE FIX) ---
+# This function runs before the *first request* to the app.
+# This is safer than creating tables at the global level,
+# which caused the error when Gunicorn imported the file.
+@app.before_request
+def create_tables_on_first_request():
+    # We use a custom flag on 'app' to ensure this runs only ONCE
+    # per application startup, not before every single request.
+    if not getattr(app, '_database_initialized', False):
+        with app.app_context():
+            db.create_all()
+        # Set the flag to True so this doesn't run again
+        app._database_initialized = True
+        print("Database tables checked/created on first request.")
 
 # --- Database Models (No changes needed) ---
 class User(UserMixin, db.Model):
@@ -64,14 +72,12 @@ class Contact(db.Model):
             'email': self.email
         }
 
-# We no longer need the 'init-db' command, so it has been removed.
-
 @login_manager.user_loader
 def load_user(user_id):
+    """Loads a user from the database for Flask-Login."""
     return User.query.get(int(user_id))
 
-# --- All other routes (login, signup, api, etc.) remain exactly the same ---
-
+# --- Authentication Routes ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -128,14 +134,17 @@ def logout():
     flash('You have been logged out.', 'success')
     return redirect(url_for('login'))
 
+# --- Main Application and API Routes ---
 @app.route('/')
 @login_required
 def index():
+    """Serves the main contact management page."""
     return render_template('index.html', username=current_user.username)
 
 @app.route('/api/contacts', methods=['GET'])
 @login_required
 def get_contacts():
+    """API endpoint to get the logged-in user's contacts, with optional search."""
     search_term = request.args.get('search', '').lower()
     query = Contact.query.filter_by(user_id=current_user.id)
     
@@ -154,6 +163,7 @@ def get_contacts():
 @app.route('/api/contacts/<int:contact_id>', methods=['GET'])
 @login_required
 def get_contact(contact_id):
+    """API endpoint to get a single contact by its ID."""
     contact = Contact.query.filter_by(id=contact_id, user_id=current_user.id).first()
     if contact:
         return jsonify(contact.to_dict())
@@ -161,7 +171,8 @@ def get_contact(contact_id):
 
 @app.route('/api/contacts', methods=['POST'])
 @login_required
-def add__contact():
+def add_contact():
+    """API endpoint to add a new contact for the logged-in user."""
     data = request.json
     if not data or not data.get('name'):
         return jsonify({'error': 'Name is a required field.'}), 400
@@ -179,6 +190,7 @@ def add__contact():
 @app.route('/api/contacts/<int:contact_id>', methods=['PUT'])
 @login_required
 def update_contact(contact_id):
+    """API endpoint to update an existing contact."""
     contact = Contact.query.filter_by(id=contact_id, user_id=current_user.id).first()
     if not contact:
         return jsonify({'error': 'Contact not found or access denied'}), 404
@@ -196,6 +208,7 @@ def update_contact(contact_id):
 @app.route('/api/contacts/<int:contact_id>', methods=['DELETE'])
 @login_required
 def delete_contact(contact_id):
+    """API endpoint to delete a contact."""
     contact = Contact.query.filter_by(id=contact_id, user_id=current_user.id).first()
     if not contact:
         return jsonify({'error': 'Contact not found or access denied'}), 404
@@ -207,6 +220,6 @@ def delete_contact(contact_id):
 @app.route('/api/contacts/count', methods=['GET'])
 @login_required
 def get_contacts_count():
+    """Returns the total number of contacts for the current user."""
     count = Contact.query.filter_by(user_id=current_user.id).count()
     return jsonify({'count': count})
-
