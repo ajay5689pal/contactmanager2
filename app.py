@@ -61,11 +61,15 @@ class Contact(db.Model):
             'email': self.email
         }
 
-# --- Auto-create Database on Start ---
-# This code runs when Gunicorn starts the app.
-# It ensures the database and tables exist at the correct path.
-with app.app_context():
-    db.create_all()
+# --- Database Initialization Command ---
+# We removed the global db.create_all()
+# Instead, we add this command to run from the Render Start Command
+@app.cli.command("init-db")
+def init_db_command():
+    """Creates the database tables."""
+    with app.app_context():
+        db.create_all()
+    print("Initialized the database.")
 
 @login_manager.user_loader
 def load_user(user_id):
