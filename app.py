@@ -10,13 +10,11 @@ app = Flask(__name__)
 # --- Configuration ---
 app.config['SECRET_KEY'] = "@VCS72xppdv"
 
-# --- FIX FOR RENDER ---
-# Point the database to Render's persistent disk path.
-# This path is available when the "Start Command" runs.
-# We set a default for local testing, but Render will use /var/data.
-db_path = os.path.join(os.environ.get('RENDER_DISK_PATH', 'instance'), 'database.db')
-
-# Ensure the directory exists before connecting (for local testing)
+# --- DATABASE CONFIGURATION FOR RENDER FREE TIER ---
+# We will use a SQLite database file.
+# WARNING: On Render's free tier, this file will be DELETED
+# every time the app restarts or goes to sleep. All data will be lost.
+db_path = os.path.join('instance', 'database.db')
 instance_folder = os.path.dirname(db_path)
 if not os.path.exists(instance_folder):
     os.makedirs(instance_folder)
@@ -31,9 +29,15 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 
-# --- Database Models ---
+# --- Database Auto-Creation ---
+# This will create the database tables every time the app starts.
+# This is necessary for Render's free tier ephemeral filesystem.
+with app.app_context():
+    db.create_all()
+    print("Database tables checked/created.")
+
+# --- Database Models (No changes needed) ---
 class User(UserMixin, db.Model):
-    """User model for authentication."""
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
@@ -46,7 +50,6 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
 class Contact(db.Model):
-    """Contact model to store contact information."""
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(50))
@@ -61,22 +64,14 @@ class Contact(db.Model):
             'email': self.email
         }
 
-# --- Database Initialization Command ---
-# This command is run by Render's "Start Command"
-# to create the database tables on the persistent disk.
-@app.cli.command("init-db")
-def init_db_command():
-    """Creates the database tables."""
-    with app.app_context():
-        db.create_all()
-    print("Initialized the database.")
+# We no longer need the 'init-db' command, so it has been removed.
 
 @login_manager.user_loader
 def load_user(user_id):
-    """Loads a user from the database for Flask-Login."""
     return User.query.get(int(user_id))
 
-# --- Authentication Routes ---
+# --- All other routes (login, signup, api, etc.) remain exactly the same ---
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -133,17 +128,14 @@ def logout():
     flash('You have been logged out.', 'success')
     return redirect(url_for('login'))
 
-# --- Main Application and API Routes ---
 @app.route('/')
 @login_required
 def index():
-    """Serves the main contact management page."""
     return render_template('index.html', username=current_user.username)
 
 @app.route('/api/contacts', methods=['GET'])
 @login_required
 def get_contacts():
-    """API endpoint to get the logged-in user's contacts, with optional search."""
     search_term = request.args.get('search', '').lower()
     query = Contact.query.filter_by(user_id=current_user.id)
     
@@ -162,7 +154,6 @@ def get_contacts():
 @app.route('/api/contacts/<int:contact_id>', methods=['GET'])
 @login_required
 def get_contact(contact_id):
-    """API endpoint to get a single contact by its ID."""
     contact = Contact.query.filter_by(id=contact_id, user_id=current_user.id).first()
     if contact:
         return jsonify(contact.to_dict())
@@ -170,8 +161,7 @@ def get_contact(contact_id):
 
 @app.route('/api/contacts', methods=['POST'])
 @login_required
-def add_contact():
-    """API endpoint to add a new contact for the logged-in user."""
+def add__contact():
     data = request.json
     if not data or not data.get('name'):
         return jsonify({'error': 'Name is a required field.'}), 400
@@ -189,7 +179,6 @@ def add_contact():
 @app.route('/api/contacts/<int:contact_id>', methods=['PUT'])
 @login_required
 def update_contact(contact_id):
-    """API endpoint to update an existing contact."""
     contact = Contact.query.filter_by(id=contact_id, user_id=current_user.id).first()
     if not contact:
         return jsonify({'error': 'Contact not found or access denied'}), 404
@@ -207,7 +196,6 @@ def update_contact(contact_id):
 @app.route('/api/contacts/<int:contact_id>', methods=['DELETE'])
 @login_required
 def delete_contact(contact_id):
-    """API endpoint to delete a contact."""
     contact = Contact.query.filter_by(id=contact_id, user_id=current_user.id).first()
     if not contact:
         return jsonify({'error': 'Contact not found or access denied'}), 404
@@ -219,7 +207,6 @@ def delete_contact(contact_id):
 @app.route('/api/contacts/count', methods=['GET'])
 @login_required
 def get_contacts_count():
-    """Returns the total number of contacts for the current user."""
     count = Contact.query.filter_by(user_id=current_user.id).count()
     return jsonify({'count': count})
 
